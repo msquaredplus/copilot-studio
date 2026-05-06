@@ -53,9 +53,17 @@ output/issue-{number}/
 
 | Secret | Description |
 |--------|-------------|
-| `ANTHROPIC_API_KEY` | Claude API key for the agent team |
+| `CLAUDE_CODE_TOKEN` | Claude Code auth token (from `claude auth token`) |
 
 Add in: Repository → Settings → Secrets and variables → Actions
+
+**Get your token locally:**
+```bash
+claude auth login   # one-time browser login
+claude auth token   # copy output → paste as CLAUDE_CODE_TOKEN secret
+```
+
+The pipeline uses `claude -p` (non-interactive print mode) — no API key needed.
 
 ### Labels
 

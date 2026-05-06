@@ -1,16 +1,15 @@
 """
 Main orchestrator for the Copilot Studio agent team pipeline.
-Triggered by GitHub Actions on issue events.
+Runs via `claude -p` CLI — no API key required, uses existing claude login session.
 """
 from __future__ import annotations
 
 import json
-import os
+import subprocess
 import sys
 import textwrap
 from pathlib import Path
 
-import anthropic
 from pydantic import ValidationError
 
 from prompts import (
@@ -27,17 +26,12 @@ from schemas import AnalysisResult, GenerationResult, WorkflowRequirements
 
 # ── Config ───────────────────────────────────────────────────────────────────
 
-MODEL = "claude-sonnet-4-6"
-MAX_TOKENS = 8192
 CONFIDENCE_THRESHOLD = 0.75
-
-client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
 
 # ── GitHub helpers ────────────────────────────────────────────────────────────
 
 def gh(cmd: str) -> str:
-    import subprocess
     result = subprocess.run(
         f"gh {cmd}", shell=True, capture_output=True, text=True
     )
@@ -52,7 +46,6 @@ def get_issue(issue_number: int) -> dict:
 
 
 def post_comment(issue_number: int, body: str) -> None:
-    import subprocess
     subprocess.run(
         ["gh", "issue", "comment", str(issue_number), "--body", body],
         check=True,
@@ -74,7 +67,6 @@ def remove_label(issue_number: int, label: str) -> None:
 
 
 def commit_output(issue_number: int, files: dict[str, str]) -> None:
-    import subprocess
     output_dir = Path(f"output/issue-{issue_number}")
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -96,19 +88,20 @@ def commit_output(issue_number: int, files: dict[str, str]) -> None:
 # ── Agent calls ───────────────────────────────────────────────────────────────
 
 def call_agent(system: str, user_message: str, context: str | None = None) -> str:
-    messages = []
+    """Invoke claude CLI in non-interactive print mode."""
+    parts = [system]
     if context:
-        messages.append({"role": "user", "content": context})
-        messages.append({"role": "assistant", "content": "Understood. I have the context."})
-    messages.append({"role": "user", "content": user_message})
+        parts.append(f"Context:\n{context}")
+    parts.append(user_message)
+    full_prompt = "\n\n---\n\n".join(parts)
 
-    response = client.messages.create(
-        model=MODEL,
-        max_tokens=MAX_TOKENS,
-        system=system,
-        messages=messages,
+    result = subprocess.run(
+        ["claude", "-p", full_prompt],
+        capture_output=True,
+        text=True,
+        check=True,
     )
-    return response.content[0].text
+    return result.stdout.strip()
 
 
 def extract_json(text: str) -> dict:
