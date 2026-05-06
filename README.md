@@ -78,24 +78,39 @@ The pipeline only processes issues with the `copilot-studio` label.
 
 ## Architecture
 
+Pipeline pattern from `msquaredplus/designthinking-team`:
+- Node.js ESM (`scripts/run-pipeline.js`)
+- Each agent: `spawnSync(claude, ['--print', '--system-prompt', ...])`, prompt via **stdin**
+- Skills files prepended to every agent system prompt (prompt cache friendly)
+- Sequential pipeline — each stage output feeds next stage as string
+- Octokit for GitHub comments and labels
+
 | Agent | Role |
 |-------|------|
-| **Analyst** | Parses issue text → structured `WorkflowRequirements` |
-| **Clarifier** | Identifies gaps → posts GitHub comment with questions |
+| **Analyst** | Parses issue → structured caveman output (IS_COMPLETE, CONFIDENCE, MISSING) |
+| **Clarifier** | Posts GitHub comment with targeted questions if info is missing |
 | **Architect** | Designs component blueprint (topics, actions, agent config) |
-| **Generator** | Produces valid `.mcs.yml` YAML files |
+| **Generator** | Produces `=== FILE: ... ===` blocks parsed into `.mcs.yml` files |
+| **Orchestrator** | Writes completion comment with file list + import instructions |
 
-All agents run on `claude-sonnet-4-6` via the Anthropic SDK.
+All agents run on `claude-sonnet-4-6` via `claude --print` CLI.
 
-## Templates
+## Skills
 
-Base templates in `templates/` follow the official schema from
-[microsoft/skills-for-copilot-studio](https://github.com/microsoft/skills-for-copilot-studio):
+Copilot Studio domain knowledge in `skills/` is loaded and prepended to every agent system prompt:
 
-- `agent.mcs.yml` — `GptComponentMetadata`
-- `settings.mcs.yml` — Auth & recognizer config
-- `topics/greeting.topic.mcs.yml` — `OnConversationStart`
-- `topics/fallback.topic.mcs.yml` — `OnUnknownIntent`
-- `topics/error-handler.topic.mcs.yml` — `OnError`
-- `actions/connector-action.mcs.yml` — `InvokeConnectorTaskAction`
-- `actions/mcp-action.mcs.yml` — `InvokeExternalAgentTaskAction` (MCP)
+- `skills/copilot-studio.md` — `.mcs.yml` schemas, kinds, action types, rules
+- `skills/caveman.md` — inter-agent communication protocol (minimal key:value format)
+
+## Setup
+
+### Required secret
+
+| Secret | Description |
+|--------|-------------|
+| `CLAUDE_CODE_TOKEN` | From `claude auth token` after `claude auth login` |
+
+```bash
+claude auth login     # one-time browser login
+claude auth token     # copy → paste as CLAUDE_CODE_TOKEN repo secret
+```

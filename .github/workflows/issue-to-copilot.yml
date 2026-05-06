@@ -13,7 +13,6 @@ permissions:
 jobs:
   process-issue:
     runs-on: ubuntu-latest
-    # Only run on issues (not PRs) and skip bot comments
     if: |
       (github.event_name == 'issues') ||
       (github.event_name == 'issue_comment' &&
@@ -26,35 +25,10 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install Claude CLI
-        run: npm install -g @anthropic-ai/claude-code
-
-      - name: Authenticate Claude CLI
-        run: claude auth login --token ${{ secrets.CLAUDE_CODE_TOKEN }}
-
-      - name: Install Python dependencies
-        run: pip install -r requirements.txt
-
-      - name: Determine issue number
-        id: issue
-        run: |
-          if [ "${{ github.event_name }}" = "issues" ]; then
-            echo "number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
-            echo "event=issue_${{ github.event.action }}" >> $GITHUB_OUTPUT
-          else
-            echo "number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
-            echo "event=comment_created" >> $GITHUB_OUTPUT
-          fi
-
       - name: Check for copilot-studio label
         id: check_label
         run: |
-          LABELS=$(gh issue view ${{ steps.issue.outputs.number }} --json labels --jq '[.labels[].name] | join(",")')
+          LABELS=$(gh issue view ${{ github.event.issue.number || github.event.issue.number }} --json labels --jq '[.labels[].name] | join(",")')
           echo "labels=$LABELS" >> $GITHUB_OUTPUT
           if echo "$LABELS" | grep -q "copilot-studio"; then
             echo "should_process=true" >> $GITHUB_OUTPUT
@@ -64,11 +38,41 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run agent pipeline
+      - name: Install Claude CLI
         if: steps.check_label.outputs.should_process == 'true'
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Install pipeline dependencies
+        if: steps.check_label.outputs.should_process == 'true'
+        run: cd scripts && npm install
+
+      - name: Resolve issue data
+        if: steps.check_label.outputs.should_process == 'true'
+        id: issue_data
         run: |
-          cd agents
-          python pipeline.py ${{ steps.issue.outputs.number }} ${{ steps.issue.outputs.event }}
+          ISSUE_NUMBER="${{ github.event.issue.number }}"
+          ISSUE_JSON=$(gh issue view "$ISSUE_NUMBER" --json number,title,body,comments)
+          ISSUE_TITLE=$(echo "$ISSUE_JSON" | jq -r '.title')
+          ISSUE_BODY=$(echo "$ISSUE_JSON" | jq -r '.body')
+          ISSUE_COMMENTS=$(echo "$ISSUE_JSON" | jq -r '[.comments[] | select(.author.login != "github-actions[bot]") | .body] | join("\n---\n")')
+          echo "number=$ISSUE_NUMBER" >> $GITHUB_OUTPUT
+          echo "title=$ISSUE_TITLE" >> $GITHUB_OUTPUT
+          # Multi-line values via env file
+          echo "ISSUE_BODY<<EOF" >> $GITHUB_ENV
+          echo "$ISSUE_BODY" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+          echo "ISSUE_COMMENTS<<EOF" >> $GITHUB_ENV
+          echo "$ISSUE_COMMENTS" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
+
+      - name: Run agent pipeline
+        if: steps.check_label.outputs.should_process == 'true'
+        run: node scripts/run-pipeline.js
+        env:
+          CLAUDE_BIN: claude
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ steps.issue_data.outputs.number }}
+          ISSUE_TITLE: ${{ steps.issue_data.outputs.title }}
+          REPO: ${{ github.repository }}

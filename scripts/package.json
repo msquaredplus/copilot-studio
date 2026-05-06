@@ -1,0 +1,11 @@
+{
+  "name": "copilot-studio-pipeline",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "pipeline": "node run-pipeline.js"
+  },
+  "dependencies": {
+    "@octokit/rest": "^21.0.0"
+  }
+}
