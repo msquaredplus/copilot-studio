@@ -1,0 +1,16 @@
+# Template: MCP action
+# Source: microsoft/skills-for-copilot-studio
+mcs.metadata:
+  componentName: AGENT_SCHEMA_NAME_McpAction
+kind: TaskDialog
+displayName: McpAction
+inputs: []
+outputs: []
+actions:
+  - kind: InvokeExternalAgentTaskAction
+    id: action_1
+    agentType: ModelContextProtocol
+    modelContextProtocolMetadata:
+      serverUrl: <mcp_server_url>
+      toolName: <tool_name>
+    parameters: {}

@@ -1,0 +1,14 @@
+# Template: Agent configuration
+# Source: microsoft/skills-for-copilot-studio
+mcs.metadata:
+  componentName: AGENT_SCHEMA_NAME
+kind: GptComponentMetadata
+displayName: AGENT_DISPLAY_NAME
+instructions: |
+  AGENT_INSTRUCTIONS
+conversationStarters:
+  - title: Example starter
+    text: How can you help me?
+aISettings:
+  model:
+    modelNameHint: GPT4oChat

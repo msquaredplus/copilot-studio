@@ -1,0 +1,15 @@
+# Template: Connector action
+# Source: microsoft/skills-for-copilot-studio
+mcs.metadata:
+  componentName: AGENT_SCHEMA_NAME_ConnectorAction
+kind: TaskDialog
+displayName: ConnectorAction
+inputs: []
+outputs: []
+actions:
+  - kind: InvokeConnectorTaskAction
+    id: action_1
+    connectionReference:
+      logicalName: <connector_logical_name>
+    operationId: <operation_id>
+    parameters: {}

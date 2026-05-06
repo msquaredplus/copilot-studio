@@ -1,0 +1,85 @@
+name: Copilot Studio Workflow Request
+description: Describe your desired Copilot Studio agent/workflow for automated generation
+title: "[Workflow] "
+labels: ["copilot-studio"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Fill in as much detail as you can. The agent team will ask follow-up questions
+        for anything that's unclear or missing.
+
+  - type: input
+    id: agent_name
+    attributes:
+      label: Agent Name
+      description: What should your Copilot Studio agent be called?
+      placeholder: "e.g. HR Support Bot"
+    validations:
+      required: true
+
+  - type: textarea
+    id: purpose
+    attributes:
+      label: Agent Purpose
+      description: What is the main goal of this agent? Who are the users?
+      placeholder: "e.g. Help employees with HR-related questions about leave, payroll, and benefits."
+    validations:
+      required: true
+
+  - type: textarea
+    id: topics
+    attributes:
+      label: Conversation Topics / Intents
+      description: |
+        List the main topics users will ask about.
+        For each topic: name, example phrases, and what the agent should do/say.
+      placeholder: |
+        **Leave Requests**
+        - Phrases: "I want to request leave", "how do I book vacation", "submit time off"
+        - Action: Ask for dates, submit to HR system via connector
+
+        **Payslip**
+        - Phrases: "show my payslip", "download pay stub"
+        - Action: Retrieve from SAP connector and send link
+
+  - type: textarea
+    id: integrations
+    attributes:
+      label: Integrations / Connectors
+      description: Which systems, APIs, or connectors should the agent connect to?
+      placeholder: |
+        - SharePoint (knowledge base)
+        - SAP SuccessFactors (leave management)
+        - Microsoft Teams (notifications)
+
+  - type: dropdown
+    id: auth
+    attributes:
+      label: Authentication
+      description: Does the agent need user authentication?
+      options:
+        - None (anonymous)
+        - Azure AD (SSO)
+        - Custom
+    validations:
+      required: true
+
+  - type: dropdown
+    id: language
+    attributes:
+      label: Primary Language
+      options:
+        - English
+        - German
+        - French
+        - Spanish
+        - Other (specify in notes)
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional Notes
+      description: Any other requirements, constraints, or context.

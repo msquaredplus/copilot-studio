@@ -1,0 +1,15 @@
+# Template: Fallback / escalation topic
+# Source: microsoft/skills-for-copilot-studio
+mcs.metadata:
+  componentName: AGENT_SCHEMA_NAME_Fallback
+kind: AdaptiveDialog
+beginDialog:
+  kind: OnUnknownIntent
+  id: main
+  actions:
+    - kind: SendActivity
+      id: fallback_msg
+      activity: I'm sorry, I didn't understand that. Could you rephrase your request?
+    - kind: SendActivity
+      id: escalate_offer
+      activity: Would you like me to connect you with a human agent?

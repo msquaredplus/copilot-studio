@@ -1,0 +1,12 @@
+# Template: Greeting topic
+# Source: microsoft/skills-for-copilot-studio
+mcs.metadata:
+  componentName: AGENT_SCHEMA_NAME_Greeting
+kind: AdaptiveDialog
+beginDialog:
+  kind: OnConversationStart
+  id: main
+  actions:
+    - kind: SendActivity
+      id: greeting_msg
+      activity: Hello! I'm AGENT_DISPLAY_NAME. How can I help you today?

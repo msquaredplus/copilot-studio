@@ -1,0 +1,69 @@
+name: Copilot Studio Pipeline
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  contents: write
+
+jobs:
+  process-issue:
+    runs-on: ubuntu-latest
+    # Only run on issues (not PRs) and skip bot comments
+    if: |
+      (github.event_name == 'issues') ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request == null &&
+       github.event.comment.user.login != 'github-actions[bot]')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Determine issue number
+        id: issue
+        run: |
+          if [ "${{ github.event_name }}" = "issues" ]; then
+            echo "number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
+            echo "event=issue_${{ github.event.action }}" >> $GITHUB_OUTPUT
+          else
+            echo "number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
+            echo "event=comment_created" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check for copilot-studio label
+        id: check_label
+        run: |
+          LABELS=$(gh issue view ${{ steps.issue.outputs.number }} --json labels --jq '[.labels[].name] | join(",")')
+          echo "labels=$LABELS" >> $GITHUB_OUTPUT
+          if echo "$LABELS" | grep -q "copilot-studio"; then
+            echo "should_process=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_process=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run agent pipeline
+        if: steps.check_label.outputs.should_process == 'true'
+        run: |
+          cd agents
+          python pipeline.py ${{ steps.issue.outputs.number }} ${{ steps.issue.outputs.event }}
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}

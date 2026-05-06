@@ -1,0 +1,12 @@
+# Template: Error handler topic
+# Source: microsoft/skills-for-copilot-studio
+mcs.metadata:
+  componentName: AGENT_SCHEMA_NAME_ErrorHandler
+kind: AdaptiveDialog
+beginDialog:
+  kind: OnError
+  id: main
+  actions:
+    - kind: SendActivity
+      id: error_msg
+      activity: Something went wrong. Please try again or contact support.

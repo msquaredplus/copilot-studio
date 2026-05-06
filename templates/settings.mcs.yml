@@ -1,0 +1,12 @@
+# Template: Agent settings
+# Source: microsoft/skills-for-copilot-studio
+displayName: AGENT_DISPLAY_NAME
+schemaName: AGENT_SCHEMA_NAME
+accessControlPolicy: ChatbotReaders
+authenticationMode: None
+configuration:
+  settings:
+    GenerativeActionsEnabled: true
+  recognizer:
+    kind: GenerativeAIRecognizer
+language: 1033
