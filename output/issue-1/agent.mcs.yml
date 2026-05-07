@@ -1,4 +1,3 @@
-```yaml
 mcs.metadata:
   componentName: rechnungs_ocr_automatisierung_Agent
 kind: GptComponentMetadata
@@ -19,4 +18,3 @@ conversationStarters: []
 aISettings:
   model:
     modelNameHint: GPT4oChat
-```

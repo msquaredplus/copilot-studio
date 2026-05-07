@@ -1,4 +1,3 @@
-```yaml
 # NOTE: This topic is invoked by Power Automate (scheduled trigger or "When new email arrives").
 # ForEach loops over pdfAttachments and fgstnr17Values are orchestrated at the
 # Power Automate level; this topic processes ONE pdf / ONE fgstnr17 value per invocation.
@@ -127,4 +126,3 @@ beginDialog:
 
     - kind: EndDialog
       id: end_workflow
-```

@@ -1,4 +1,3 @@
-```yaml
 # Pluggable rule chain. Add RULE_05..N as additional ConditionGroup blocks.
 # Never modify existing rule IDs — preserves audit trail.
 mcs.metadata:
@@ -100,4 +99,3 @@ actions:
     id: expose_fehler
     variable: $outputs.fehlerBeschreibung
     value: =Dialog.fehlerBeschreibung
-```

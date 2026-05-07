@@ -1,4 +1,3 @@
-```yaml
 mcs.metadata:
   componentName: rechnungs_ocr_automatisierung_HoleEmailsAction
 kind: TaskDialog
@@ -24,14 +23,21 @@ outputs:
 actions:
   - kind: InvokeConnectorTaskAction
     id: action_get_emails
+    resultVariable: Dialog.emailsRaw
     connectionReference:
       logicalName: shared_office365
-    operationId: GetEmails
+    operationId: GetEmails_V3
     parameters:
       folderPath: =$inputs.folderPath
       subject: =$inputs.subjectFilter
       top: =$inputs.top
       fetchOnlyWithAttachment: true
-      # Post-processing note: filter returned attachments by contentType = application/pdf
-      # and expose as outputs.attachments; full email list exposed as outputs.emails
-```
+      importance: Any
+  - kind: SetVariable
+    id: set_output_emails
+    variable: $outputs.emails
+    value: =Dialog.emailsRaw.value
+  - kind: SetVariable
+    id: set_output_attachments
+    variable: $outputs.attachments
+    value: =Filter(Dialog.emailsRaw.value, HasAttachments = true)

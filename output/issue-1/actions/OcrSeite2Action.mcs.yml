@@ -1,8 +1,9 @@
-```yaml
-# NOTE: Same custom connector as OcrSeite1Action.
-# Column extraction heuristic: parse tables array from page 2 response;
-# locate column header "FGSTNR17"; extract all non-header cell values as array.
-# Low-contrast scan — ocrHighResolution + prebuilt-layout mandatory.
+# Custom connector required: Azure AI Document Intelligence (same as OcrSeite1Action)
+# Expected connector response schema:
+#   { fgstnr17Values: string[], success: boolean, error: string }
+# The connector's response mapping extracts table on page 2:
+#   tables[0].cells where columnHeader = "FGSTNR17" → fgstnr17Values array
+# Low-contrast scan: ocrHighResolution is mandatory.
 mcs.metadata:
   componentName: rechnungs_ocr_automatisierung_OcrSeite2Action
 kind: TaskDialog
@@ -19,16 +20,49 @@ outputs:
   - name: error
     type: string
 actions:
+  - kind: SetVariable
+    id: init_success
+    variable: Dialog.ocrSuccess
+    value: =false
+  - kind: SetVariable
+    id: init_error
+    variable: Dialog.ocrError
+    value: ""
   - kind: InvokeConnectorTaskAction
     id: action_ocr_seite2
+    resultVariable: Dialog.ocrResult
     connectionReference:
       logicalName: <azure_document_intelligence_custom_connector>
-    operationId: AnalyzeDocument
+    operationId: AnalyzeDocumentPage2
     parameters:
       documentBase64: =$inputs.documentBase64
       modelId: prebuilt-layout
       pages: "2"
       features: ocrHighResolution
-      # Response transform: tables[*].cells where columnHeader = "FGSTNR17"
-      # → collect .content values into fgstnr17Values array
-```
+  - kind: ConditionGroup
+    id: cond_ocr2_response
+    conditions:
+      - id: cond_ocr2_ok
+        condition: =CountRows(Dialog.ocrResult.fgstnr17Values) > 0
+        actions:
+          - kind: SetVariable
+            id: set_success_true
+            variable: Dialog.ocrSuccess
+            value: =true
+    elseActions:
+      - kind: SetVariable
+        id: set_error_msg
+        variable: Dialog.ocrError
+        value: =If(IsBlank(Dialog.ocrResult.error), "Keine FGSTNR17-Werte auf Seite 2 erkannt", Dialog.ocrResult.error)
+  - kind: SetVariable
+    id: expose_success
+    variable: $outputs.success
+    value: =Dialog.ocrSuccess
+  - kind: SetVariable
+    id: expose_fgstnr17
+    variable: $outputs.fgstnr17Values
+    value: =Dialog.ocrResult.fgstnr17Values
+  - kind: SetVariable
+    id: expose_error
+    variable: $outputs.error
+    value: =Dialog.ocrError

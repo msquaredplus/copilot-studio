@@ -1,4 +1,3 @@
-```yaml
 mcs.metadata:
   componentName: rechnungs_ocr_automatisierung_Fallback
 kind: AdaptiveDialog
@@ -11,4 +10,3 @@ beginDialog:
       activity: >-
         Dieser Agent verarbeitet keine manuellen Anfragen.
         Bitte prüfen Sie das SharePoint-Excel für Ergebnisse.
-```

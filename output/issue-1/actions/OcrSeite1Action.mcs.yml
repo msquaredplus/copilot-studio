@@ -1,8 +1,11 @@
-```yaml
-# NOTE: Requires custom connector registration in Power Platform.
-# Base URL: https://<resource>.cognitiveservices.azure.com/documentintelligence/documentModels
-# Auth: AAD — scope: https://cognitiveservices.azure.com/.default
-# Register connector before syncPush; replace logical name placeholder below.
+# Custom connector required: Azure AI Document Intelligence
+# Connector setup: see INTEGRATION.md → Schritt 3
+# Expected connector response schema:
+#   { rechnungsnummer: string, faelligkeitsdatum: string, success: boolean, error: string }
+# The connector's response mapping (in Power Platform custom connector swagger)
+# extracts keyValuePairs from prebuilt-layout page 1 and maps:
+#   key "RECHNUNG-Nummer.:" → rechnungsnummer
+#   key "Fälligkeit:"       → faelligkeitsdatum
 mcs.metadata:
   componentName: rechnungs_ocr_automatisierung_OcrSeite1Action
 kind: TaskDialog
@@ -21,19 +24,53 @@ outputs:
   - name: error
     type: string
 actions:
+  - kind: SetVariable
+    id: init_success
+    variable: Dialog.ocrSuccess
+    value: =false
+  - kind: SetVariable
+    id: init_error
+    variable: Dialog.ocrError
+    value: ""
   - kind: InvokeConnectorTaskAction
     id: action_ocr_seite1
+    resultVariable: Dialog.ocrResult
     connectionReference:
       logicalName: <azure_document_intelligence_custom_connector>
-    operationId: AnalyzeDocument
+    operationId: AnalyzeDocumentPage1
     parameters:
       documentBase64: =$inputs.documentBase64
       modelId: prebuilt-layout
       pages: "1"
       features: ocrHighResolution
-      # Field extraction heuristic (implement in connector response transform):
-      # - Locate key-value pair "RECHNUNG-Nummer.:" → rechnungsnummer
-      # - Locate key-value pair "Fälligkeit:"       → faelligkeitsdatum
-      # - Region: top-right quadrant of page 1
-      # - Map success/error from HTTP response status
-```
+  - kind: ConditionGroup
+    id: cond_ocr1_response
+    conditions:
+      - id: cond_ocr1_ok
+        condition: =Not(IsBlank(Dialog.ocrResult.rechnungsnummer))
+        actions:
+          - kind: SetVariable
+            id: set_success_true
+            variable: Dialog.ocrSuccess
+            value: =true
+    elseActions:
+      - kind: SetVariable
+        id: set_error_msg
+        variable: Dialog.ocrError
+        value: =If(IsBlank(Dialog.ocrResult.error), "Felder nicht gefunden auf Seite 1", Dialog.ocrResult.error)
+  - kind: SetVariable
+    id: expose_success
+    variable: $outputs.success
+    value: =Dialog.ocrSuccess
+  - kind: SetVariable
+    id: expose_rechnungsnummer
+    variable: $outputs.rechnungsnummer
+    value: =Dialog.ocrResult.rechnungsnummer
+  - kind: SetVariable
+    id: expose_faelligkeitsdatum
+    variable: $outputs.faelligkeitsdatum
+    value: =Dialog.ocrResult.faelligkeitsdatum
+  - kind: SetVariable
+    id: expose_error
+    variable: $outputs.error
+    value: =Dialog.ocrError

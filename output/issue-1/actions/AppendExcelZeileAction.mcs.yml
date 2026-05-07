@@ -1,6 +1,10 @@
-```yaml
-# NOTE: sharepointUrl and excelFilePath must be set as Power Platform
-# Environment Variables before deployment. Do not hardcode values here.
+# KONFIGURATION erforderlich (Power Platform Environment Variables):
+#   SHAREPOINT_SITE_URL  — z.B. https://firma.sharepoint.com/sites/Buchhaltung
+#   EXCEL_FILE_PATH      — z.B. /Freigegebene Dokumente/Rechnungen.xlsx
+#   EXCEL_TABLE_NAME     — Name der formatierten Excel-Tabelle im Sheet "Rechnungen"
+#                          (Excel-Tabelle muss als Tabelle formatiert sein, nicht nur Sheet!)
+# Spaltenüberschriften in Excel müssen exakt lauten:
+#   Rechnungsnummer | Fälligkeitsdatum | VIN | Fehler
 mcs.metadata:
   componentName: rechnungs_ocr_automatisierung_AppendExcelZeileAction
 kind: TaskDialog
@@ -27,16 +31,25 @@ outputs:
 actions:
   - kind: InvokeConnectorTaskAction
     id: action_append_row
+    resultVariable: Dialog.appendResult
     connectionReference:
-      logicalName: shared_sharepointOnline
+      logicalName: shared_excelonlinebusiness
     operationId: AddTableRow
     parameters:
-      siteUrl: =Global.sharepointUrl
-      filePath: =Global.excelFilePath
-      sheetName: Rechnungen
-      tableRow:
+      source: SharePoint
+      drive: =Global.sharepointSiteUrl
+      file: =Global.excelFilePath
+      table: =Global.excelTableName
+      item:
         Rechnungsnummer: =$inputs.rechnungsnummer
-        Faelligkeitsdatum: =$inputs.faelligkeitsdatum
+        Fälligkeitsdatum: =$inputs.faelligkeitsdatum
         VIN: =$inputs.currentFgstnr17
         Fehler: =$inputs.fehlerBeschreibung
-```
+  - kind: SetVariable
+    id: expose_success
+    variable: $outputs.success
+    value: =Not(IsBlank(Dialog.appendResult.id))
+  - kind: SetVariable
+    id: expose_rowid
+    variable: $outputs.rowId
+    value: =Dialog.appendResult.id

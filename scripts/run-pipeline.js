@@ -53,7 +53,6 @@ function runAgent(agentName, userMessage) {
       '--system-prompt', systemPrompt,
       '--model', MODEL,
       '--no-session-persistence',
-      '--dangerously-skip-permissions',
       '--tools', '',
     ],
     {
