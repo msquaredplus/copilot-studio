@@ -1,0 +1,39 @@
+```yaml
+# NOTE: Requires custom connector registration in Power Platform.
+# Base URL: https://<resource>.cognitiveservices.azure.com/documentintelligence/documentModels
+# Auth: AAD — scope: https://cognitiveservices.azure.com/.default
+# Register connector before syncPush; replace logical name placeholder below.
+mcs.metadata:
+  componentName: rechnungs_ocr_automatisierung_OcrSeite1Action
+kind: TaskDialog
+displayName: OcrSeite1Action
+inputs:
+  - name: documentBase64
+    type: string
+    required: true
+outputs:
+  - name: success
+    type: boolean
+  - name: rechnungsnummer
+    type: string
+  - name: faelligkeitsdatum
+    type: string
+  - name: error
+    type: string
+actions:
+  - kind: InvokeConnectorTaskAction
+    id: action_ocr_seite1
+    connectionReference:
+      logicalName: <azure_document_intelligence_custom_connector>
+    operationId: AnalyzeDocument
+    parameters:
+      documentBase64: =$inputs.documentBase64
+      modelId: prebuilt-layout
+      pages: "1"
+      features: ocrHighResolution
+      # Field extraction heuristic (implement in connector response transform):
+      # - Locate key-value pair "RECHNUNG-Nummer.:" → rechnungsnummer
+      # - Locate key-value pair "Fälligkeit:"       → faelligkeitsdatum
+      # - Region: top-right quadrant of page 1
+      # - Map success/error from HTTP response status
+```

@@ -1,0 +1,34 @@
+```yaml
+# NOTE: Same custom connector as OcrSeite1Action.
+# Column extraction heuristic: parse tables array from page 2 response;
+# locate column header "FGSTNR17"; extract all non-header cell values as array.
+# Low-contrast scan — ocrHighResolution + prebuilt-layout mandatory.
+mcs.metadata:
+  componentName: rechnungs_ocr_automatisierung_OcrSeite2Action
+kind: TaskDialog
+displayName: OcrSeite2Action
+inputs:
+  - name: documentBase64
+    type: string
+    required: true
+outputs:
+  - name: success
+    type: boolean
+  - name: fgstnr17Values
+    type: array
+  - name: error
+    type: string
+actions:
+  - kind: InvokeConnectorTaskAction
+    id: action_ocr_seite2
+    connectionReference:
+      logicalName: <azure_document_intelligence_custom_connector>
+    operationId: AnalyzeDocument
+    parameters:
+      documentBase64: =$inputs.documentBase64
+      modelId: prebuilt-layout
+      pages: "2"
+      features: ocrHighResolution
+      # Response transform: tables[*].cells where columnHeader = "FGSTNR17"
+      # → collect .content values into fgstnr17Values array
+```

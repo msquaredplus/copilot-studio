@@ -1,0 +1,12 @@
+```yaml
+mcs.metadata:
+  componentName: rechnungs_ocr_automatisierung_Greeting
+kind: AdaptiveDialog
+beginDialog:
+  kind: OnConversationStart
+  id: main
+  actions:
+    - kind: SendActivity
+      id: msg_greeting
+      activity: Rechnungs-OCR-Automatisierung aktiv. Workflow startet automatisch.
+```

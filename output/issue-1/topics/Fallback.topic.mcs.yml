@@ -1,0 +1,14 @@
+```yaml
+mcs.metadata:
+  componentName: rechnungs_ocr_automatisierung_Fallback
+kind: AdaptiveDialog
+beginDialog:
+  kind: OnUnknownIntent
+  id: main
+  actions:
+    - kind: SendActivity
+      id: msg_fallback
+      activity: >-
+        Dieser Agent verarbeitet keine manuellen Anfragen.
+        Bitte prüfen Sie das SharePoint-Excel für Ergebnisse.
+```

@@ -1,0 +1,12 @@
+```yaml
+mcs.metadata:
+  componentName: rechnungs_ocr_automatisierung_ErrorHandler
+kind: AdaptiveDialog
+beginDialog:
+  kind: OnError
+  id: main
+  actions:
+    - kind: SendActivity
+      id: msg_error
+      activity: Systemfehler aufgetreten. Bitte Administrator kontaktieren.
+```

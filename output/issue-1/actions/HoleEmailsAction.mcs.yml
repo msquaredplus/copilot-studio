@@ -1,0 +1,37 @@
+```yaml
+mcs.metadata:
+  componentName: rechnungs_ocr_automatisierung_HoleEmailsAction
+kind: TaskDialog
+displayName: HoleEmailsAction
+inputs:
+  - name: subjectFilter
+    type: string
+    required: false
+    defaultValue: Rechnung
+  - name: folderPath
+    type: string
+    required: false
+    defaultValue: Inbox
+  - name: top
+    type: number
+    required: false
+    defaultValue: 10
+outputs:
+  - name: emails
+    type: array
+  - name: attachments
+    type: array
+actions:
+  - kind: InvokeConnectorTaskAction
+    id: action_get_emails
+    connectionReference:
+      logicalName: shared_office365
+    operationId: GetEmails
+    parameters:
+      folderPath: =$inputs.folderPath
+      subject: =$inputs.subjectFilter
+      top: =$inputs.top
+      fetchOnlyWithAttachment: true
+      # Post-processing note: filter returned attachments by contentType = application/pdf
+      # and expose as outputs.attachments; full email list exposed as outputs.emails
+```

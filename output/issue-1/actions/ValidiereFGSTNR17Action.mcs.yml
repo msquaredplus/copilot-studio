@@ -1,0 +1,103 @@
+```yaml
+# Pluggable rule chain. Add RULE_05..N as additional ConditionGroup blocks.
+# Never modify existing rule IDs — preserves audit trail.
+mcs.metadata:
+  componentName: rechnungs_ocr_automatisierung_ValidiereFGSTNR17Action
+kind: TaskDialog
+displayName: ValidiereFGSTNR17Action
+inputs:
+  - name: rawValue
+    type: string
+    required: true
+outputs:
+  - name: validationPassed
+    type: boolean
+  - name: fehlerBeschreibung
+    type: string
+actions:
+  # ── Init ──────────────────────────────────────────────────────────────────
+  - kind: SetVariable
+    id: set_passed_init
+    variable: Dialog.validationPassed
+    value: =true
+  - kind: SetVariable
+    id: set_fehler_init
+    variable: Dialog.fehlerBeschreibung
+    value: ""
+
+  # ── RULE_01: Length = 17 ──────────────────────────────────────────────────
+  - kind: ConditionGroup
+    id: cond_rule01
+    conditions:
+      - id: cond_rule01_fail
+        condition: =Len($inputs.rawValue) <> 17
+        actions:
+          - kind: SetVariable
+            id: set_fail_r01
+            variable: Dialog.validationPassed
+            value: =false
+          - kind: SetVariable
+            id: set_fehler_r01
+            variable: Dialog.fehlerBeschreibung
+            value: =If(Dialog.fehlerBeschreibung = "", "Länge ungültig (erwartet 17, erhalten " & Text(Len($inputs.rawValue)) & ")", Dialog.fehlerBeschreibung & " | Länge ungültig (erwartet 17, erhalten " & Text(Len($inputs.rawValue)) & ")")
+
+  # ── RULE_02: Only [A-Z0-9] ────────────────────────────────────────────────
+  - kind: ConditionGroup
+    id: cond_rule02
+    conditions:
+      - id: cond_rule02_fail
+        condition: =IsMatch($inputs.rawValue, "[^A-Z0-9]")
+        actions:
+          - kind: SetVariable
+            id: set_fail_r02
+            variable: Dialog.validationPassed
+            value: =false
+          - kind: SetVariable
+            id: set_fehler_r02
+            variable: Dialog.fehlerBeschreibung
+            value: =If(Dialog.fehlerBeschreibung = "", "Ungültige Zeichen gefunden", Dialog.fehlerBeschreibung & " | Ungültige Zeichen gefunden")
+
+  # ── RULE_03: Character 'O' must not appear ────────────────────────────────
+  - kind: ConditionGroup
+    id: cond_rule03
+    conditions:
+      - id: cond_rule03_fail
+        condition: =Not(IsBlank(Find("O", $inputs.rawValue)))
+        actions:
+          - kind: SetVariable
+            id: set_fail_r03
+            variable: Dialog.validationPassed
+            value: =false
+          - kind: SetVariable
+            id: set_fehler_r03
+            variable: Dialog.fehlerBeschreibung
+            value: =If(Dialog.fehlerBeschreibung = "", "Buchstabe O gefunden (nur 0 erlaubt)", Dialog.fehlerBeschreibung & " | Buchstabe O gefunden (nur 0 erlaubt)")
+
+  # ── RULE_04: Character 'l' must not appear ────────────────────────────────
+  - kind: ConditionGroup
+    id: cond_rule04
+    conditions:
+      - id: cond_rule04_fail
+        condition: =Not(IsBlank(Find("l", $inputs.rawValue)))
+        actions:
+          - kind: SetVariable
+            id: set_fail_r04
+            variable: Dialog.validationPassed
+            value: =false
+          - kind: SetVariable
+            id: set_fehler_r04
+            variable: Dialog.fehlerBeschreibung
+            value: =If(Dialog.fehlerBeschreibung = "", "Kleinbuchstabe l gefunden (nur 1 erlaubt)", Dialog.fehlerBeschreibung & " | Kleinbuchstabe l gefunden (nur 1 erlaubt)")
+
+  # ── RULE_05..N: Insert additional ConditionGroup blocks here ──────────────
+
+  # ── Expose outputs ────────────────────────────────────────────────────────
+  - kind: SetVariable
+    id: expose_validation_passed
+    variable: $outputs.validationPassed
+    value: =Dialog.validationPassed
+  - kind: SetVariable
+    id: expose_fehler
+    variable: $outputs.fehlerBeschreibung
+    value: =Dialog.fehlerBeschreibung
+```

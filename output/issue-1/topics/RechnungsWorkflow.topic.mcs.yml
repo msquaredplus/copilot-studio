@@ -1,0 +1,130 @@
+```yaml
+# NOTE: This topic is invoked by Power Automate (scheduled trigger or "When new email arrives").
+# ForEach loops over pdfAttachments and fgstnr17Values are orchestrated at the
+# Power Automate level; this topic processes ONE pdf / ONE fgstnr17 value per invocation.
+# Power Automate passes currentPdf and currentFgstnr17 as conversation parameters.
+mcs.metadata:
+  componentName: rechnungs_ocr_automatisierung_RechnungsWorkflow
+kind: AdaptiveDialog
+beginDialog:
+  kind: OnConversationStart
+  id: main
+  actions:
+    # ── Init ────────────────────────────────────────────────────────────────
+    - kind: SetVariable
+      id: set_fehler_init
+      variable: Dialog.fehlerBeschreibung
+      value: ""
+    - kind: SetVariable
+      id: set_rechnungsnr_init
+      variable: Dialog.rechnungsnummer
+      value: ""
+    - kind: SetVariable
+      id: set_faellig_init
+      variable: Dialog.faelligkeitsdatum
+      value: ""
+
+    # ── Step 1: Fetch emails & PDF attachments ───────────────────────────────
+    - kind: BeginDialog
+      id: call_hole_emails
+      dialog: rechnungs_ocr_automatisierung_HoleEmailsAction
+      inputBindings:
+        subjectFilter: =Global.emailSubjectFilter
+        folderPath: Inbox
+        top: 10
+      resultVariable: Dialog.holeEmailsResult
+    - kind: SetVariable
+      id: set_pdf_attachments
+      variable: Dialog.pdfAttachments
+      value: =Dialog.holeEmailsResult.outputs.attachments
+
+    # ── Step 2: OCR Page 1 ───────────────────────────────────────────────────
+    - kind: BeginDialog
+      id: call_ocr_seite1
+      dialog: rechnungs_ocr_automatisierung_OcrSeite1Action
+      inputBindings:
+        documentBase64: =Dialog.currentPdf.contentBytes
+      resultVariable: Dialog.ocrPage1Result
+    - kind: ConditionGroup
+      id: cond_ocr1
+      conditions:
+        - id: cond_ocr1_success
+          condition: =Dialog.ocrPage1Result.outputs.success = true
+          actions:
+            - kind: SetVariable
+              id: set_rechnungsnr
+              variable: Dialog.rechnungsnummer
+              value: =Dialog.ocrPage1Result.outputs.rechnungsnummer
+            - kind: SetVariable
+              id: set_faellig
+              variable: Dialog.faelligkeitsdatum
+              value: =Dialog.ocrPage1Result.outputs.faelligkeitsdatum
+      elseActions:
+        - kind: SetVariable
+          id: set_fehler_ocr1
+          variable: Dialog.fehlerBeschreibung
+          value: ="OCR Seite 1 fehlgeschlagen: " & Dialog.ocrPage1Result.outputs.error
+
+    # ── Step 3: OCR Page 2 ───────────────────────────────────────────────────
+    - kind: BeginDialog
+      id: call_ocr_seite2
+      dialog: rechnungs_ocr_automatisierung_OcrSeite2Action
+      inputBindings:
+        documentBase64: =Dialog.currentPdf.contentBytes
+      resultVariable: Dialog.ocrPage2Result
+    - kind: ConditionGroup
+      id: cond_ocr2
+      conditions:
+        - id: cond_ocr2_success
+          condition: =Dialog.ocrPage2Result.outputs.success = true
+          actions:
+            - kind: SetVariable
+              id: set_fgstnr17_values
+              variable: Dialog.fgstnr17Values
+              value: =Dialog.ocrPage2Result.outputs.fgstnr17Values
+      elseActions:
+        - kind: SetVariable
+          id: set_fgstnr17_error_placeholder
+          variable: Dialog.fgstnr17Values
+          value: =["__OCR_FEHLER__"]
+        - kind: SetVariable
+          id: set_fehler_ocr2
+          variable: Dialog.fehlerBeschreibung
+          value: =Dialog.fehlerBeschreibung & " | OCR Seite 2 fehlgeschlagen: " & Dialog.ocrPage2Result.outputs.error
+
+    # ── Step 4: Validate FGSTNR17 (per-value — PA loop sets currentFgstnr17) ─
+    - kind: BeginDialog
+      id: call_validiere_fgstnr17
+      dialog: rechnungs_ocr_automatisierung_ValidiereFGSTNR17Action
+      inputBindings:
+        rawValue: =Dialog.currentFgstnr17
+      resultVariable: Dialog.validationResult
+    - kind: SetVariable
+      id: set_validation_passed
+      variable: Dialog.validationPassed
+      value: =Dialog.validationResult.outputs.validationPassed
+    - kind: ConditionGroup
+      id: cond_validation_fehler
+      conditions:
+        - id: cond_val_fail
+          condition: =Dialog.validationResult.outputs.validationPassed = false
+          actions:
+            - kind: SetVariable
+              id: set_fehler_from_validation
+              variable: Dialog.fehlerBeschreibung
+              value: =If(Dialog.fehlerBeschreibung = "", Dialog.validationResult.outputs.fehlerBeschreibung, Dialog.fehlerBeschreibung & " | " & Dialog.validationResult.outputs.fehlerBeschreibung)
+
+    # ── Step 5: Append row to SharePoint Excel ───────────────────────────────
+    - kind: BeginDialog
+      id: call_append_excel
+      dialog: rechnungs_ocr_automatisierung_AppendExcelZeileAction
+      inputBindings:
+        rechnungsnummer: =Dialog.rechnungsnummer
+        faelligkeitsdatum: =Dialog.faelligkeitsdatum
+        currentFgstnr17: =Dialog.currentFgstnr17
+        fehlerBeschreibung: =Dialog.fehlerBeschreibung
+      resultVariable: Dialog.appendResult
+
+    - kind: EndDialog
+      id: end_workflow
+```

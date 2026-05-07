@@ -1,0 +1,42 @@
+```yaml
+# NOTE: sharepointUrl and excelFilePath must be set as Power Platform
+# Environment Variables before deployment. Do not hardcode values here.
+mcs.metadata:
+  componentName: rechnungs_ocr_automatisierung_AppendExcelZeileAction
+kind: TaskDialog
+displayName: AppendExcelZeileAction
+inputs:
+  - name: rechnungsnummer
+    type: string
+    required: true
+  - name: faelligkeitsdatum
+    type: string
+    required: true
+  - name: currentFgstnr17
+    type: string
+    required: true
+  - name: fehlerBeschreibung
+    type: string
+    required: false
+    defaultValue: ""
+outputs:
+  - name: success
+    type: boolean
+  - name: rowId
+    type: string
+actions:
+  - kind: InvokeConnectorTaskAction
+    id: action_append_row
+    connectionReference:
+      logicalName: shared_sharepointOnline
+    operationId: AddTableRow
+    parameters:
+      siteUrl: =Global.sharepointUrl
+      filePath: =Global.excelFilePath
+      sheetName: Rechnungen
+      tableRow:
+        Rechnungsnummer: =$inputs.rechnungsnummer
+        Faelligkeitsdatum: =$inputs.faelligkeitsdatum
+        VIN: =$inputs.currentFgstnr17
+        Fehler: =$inputs.fehlerBeschreibung
+```

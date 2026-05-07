@@ -1,0 +1,12 @@
+```yaml
+displayName: Rechnungs-OCR-Automatisierung
+schemaName: rechnungs_ocr_automatisierung
+accessControlPolicy: ChatbotReaders
+authenticationMode: AAD
+configuration:
+  settings:
+    GenerativeActionsEnabled: true
+  recognizer:
+    kind: GenerativeAIRecognizer
+language: 1031
+```
