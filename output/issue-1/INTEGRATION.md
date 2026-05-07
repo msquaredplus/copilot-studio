@@ -1,23 +1,31 @@
 # Rechnungs-OCR-Automatisierung — Integrationsanleitung
 
-**Für wen ist diese Anleitung?**  
-Für Personen ohne Programmierkenntnisse, die den Workflow in Microsoft Copilot Studio einrichten möchten.
+**Zielgruppe:** Personen ohne Programmierkenntnisse  
+**Zugang:** Ausschließlich über den Browser — kein VS Code, kein lokales Tool nötig
 
 **Was macht der Workflow?**  
-Sobald eine E-Mail mit dem Betreff „Rechnung" in Ihrem Postfach eingeht, liest der Workflow automatisch alle PDF-Anhänge aus, extrahiert Rechnungsnummer, Fälligkeitsdatum und die Fahrzeugidentifikationsnummern (VIN/FGSTNR17) und trägt diese Daten in eine Excel-Datei auf SharePoint ein.
+Sobald eine E-Mail mit dem Betreff „Rechnung" eingeht, liest der Workflow automatisch alle PDF-Anhänge aus, extrahiert Rechnungsnummer, Fälligkeitsdatum und Fahrzeugidentifikationsnummern (VIN/FGSTNR17) und trägt diese Daten in eine Excel-Datei auf SharePoint ein.
 
 ---
 
-## Voraussetzungen (vor Schritt 1)
+## Überblick: Zwei Wege zur Installation
 
-Stellen Sie sicher, dass folgende Dinge vorhanden sind:
+| Weg | Wann nutzen | Aufwand |
+|-----|-------------|---------|
+| **A — KI-Prompt-Erstellung** | Schnellstart, Grundstruktur automatisch | Niedrig — KI baut die Nodes, Sie füllen Parameter |
+| **B — Code-Editor (YAML einfügen)** | Exakte Logik aus dieser Vorlage übernehmen | Mittel — YAML kopieren, Parameter setzen |
+
+**Empfehlung:** Beginnen Sie mit **Weg A** für die Grundstruktur. Nutzen Sie **Weg B** für die komplexen Teile (Validierung, Fehlerbehandlung).
+
+---
+
+## Voraussetzungen
 
 | Was | Warum |
 |-----|-------|
-| Microsoft 365-Konto (mit Copilot Studio-Lizenz) | Für den Import und Betrieb |
+| Microsoft 365-Konto mit Copilot Studio-Lizenz | Zugang zu copilotstudio.microsoft.com |
 | Azure-Abonnement | Für den OCR-Dienst (Azure AI Document Intelligence) |
-| SharePoint-Site mit einer Excel-Datei | Als Ziel für die extrahierten Daten |
-| VS Code (kostenlos) + Power Platform Tools-Erweiterung | Zum Hochladen der Dateien |
+| SharePoint-Seite mit Excel-Datei | Ziel für die extrahierten Daten |
 
 ---
 
@@ -25,15 +33,15 @@ Stellen Sie sicher, dass folgende Dinge vorhanden sind:
 
 1. Öffnen Sie Ihre Excel-Datei auf SharePoint im Browser.
 2. Navigieren Sie zum Sheet **„Rechnungen"**.
-3. Tragen Sie in **Zeile 1** folgende Spaltenüberschriften ein (exakt so, mit Umlaut):
+3. Tragen Sie in **Zeile 1** folgende Spaltenüberschriften ein — exakt so, mit Umlaut:
 
    | A | B | C | D |
    |---|---|---|---|
    | Rechnungsnummer | Fälligkeitsdatum | VIN | Fehler |
 
-4. Markieren Sie die gesamte Zeile 1 und alle Datenspalten darunter.
-5. Klicken Sie im Menü auf **Einfügen → Tabelle** und bestätigen Sie „Meine Tabelle hat Überschriften".
-6. **Wichtig:** Notieren Sie den **Tabellennamen** (standardmäßig „Tabelle1" — sichtbar im Reiter „Tabellendesign" wenn die Tabelle ausgewählt ist).
+4. Markieren Sie Zeile 1 und alle Spalten.
+5. Klicken Sie im Menü auf **Einfügen → Tabelle** → „Meine Tabelle hat Überschriften" bestätigen.
+6. Notieren Sie den **Tabellennamen** (sichtbar im Reiter „Tabellendesign", z.B. `Tabelle1`).
 
 > ⚠️ Der Workflow schreibt nur in eine **formatierte Excel-Tabelle**, nicht in ein normales Sheet!
 
@@ -41,153 +49,169 @@ Stellen Sie sicher, dass folgende Dinge vorhanden sind:
 
 ## Schritt 2 — Azure AI Document Intelligence einrichten
 
-1. Öffnen Sie das [Azure-Portal](https://portal.azure.com).
-2. Klicken Sie auf **Ressource erstellen** → Suche nach **„Document Intelligence"**.
-3. Erstellen Sie eine neue Instanz:
-   - Preisstufe: **S0** (Standard — für produktiven Einsatz)
-   - Region: z.B. **West Europe**
-4. Nach der Erstellung öffnen Sie die Ressource und klicken auf **„Schlüssel und Endpunkt"**.
+1. Öffnen Sie [portal.azure.com](https://portal.azure.com).
+2. **Ressource erstellen** → suchen Sie nach **„Document Intelligence"**.
+3. Neue Instanz erstellen:
+   - Preisstufe: **S0** (Standard)
+   - Region: **West Europe**
+4. Nach der Erstellung: Ressource öffnen → **„Schlüssel und Endpunkt"**.
 5. Notieren Sie:
    - **Endpunkt** (z.B. `https://meine-ressource.cognitiveservices.azure.com/`)
    - **Schlüssel 1**
 
 ---
 
-## Schritt 3 — Benutzerdefinierten Connector erstellen
-
-Der Workflow kommuniziert über einen „Connector" mit dem OCR-Dienst. Diesen müssen Sie einmalig anlegen.
-
-1. Öffnen Sie [make.powerapps.com](https://make.powerapps.com) und melden Sie sich an.
-2. Klicken Sie links auf **„Weitere..."** → **„Benutzerdefinierte Connectors"**.
-3. Klicken Sie oben rechts auf **„+ Neuer benutzerdefinierter Connector" → „Aus leerer Vorlage"**.
-4. Name: `AzureDocumentIntelligence`
-5. Wechseln Sie zum Tab **„Sicherheit"**:
-   - Authentifizierungstyp: **API-Schlüssel**
-   - Parameterlabel: `Ocp-Apim-Subscription-Key`
-   - Parameterstandort: **Header**
-6. Wechseln Sie zum Tab **„Definition"** und fügen Sie zwei Aktionen ein:
-
-   **Aktion 1: AnalyzeDocumentPage1**
-   - Zusammenfassung: OCR Seite 1
-   - Verb: POST
-   - URL: `{Ihr Endpunkt}/documentintelligence/documentModels/prebuilt-layout:analyze?api-version=2024-02-29-preview&pages=1&features=ocrHighResolution`
-   - Anforderungstext (JSON):
-     ```json
-     { "base64Source": "" }
-     ```
-   - Antwortschema (JSON — definiert was zurückgegeben wird):
-     ```json
-     {
-       "rechnungsnummer": "",
-       "faelligkeitsdatum": "",
-       "success": true,
-       "error": ""
-     }
-     ```
-
-   **Aktion 2: AnalyzeDocumentPage2**
-   - Wie oben, aber URL mit `pages=2`
-   - Antwortschema:
-     ```json
-     {
-       "fgstnr17Values": [],
-       "success": true,
-       "error": ""
-     }
-     ```
-
-   > 💡 **Hinweis zu den Antwortschemas:** Die Felder `rechnungsnummer`, `faelligkeitsdatum` und `fgstnr17Values` werden durch eine **Antwortumwandlung** (Response Transform / Policy) aus der Document Intelligence-Antwort extrahiert. Bitten Sie Ihren IT-Administrator, die Transformation einzurichten — die genaue Konfiguration hängt von Ihrer Connector-Version ab.
-
-7. Klicken Sie auf **„Connector erstellen"**.
-8. Notieren Sie den **logischen Namen** des Connectors (sichtbar in der URL nach dem Erstellen, z.B. `shared_azuredocumentintelligence`).
-9. Ersetzen Sie in den Dateien `OcrSeite1Action.mcs.yml` und `OcrSeite2Action.mcs.yml` den Platzhalter `<azure_document_intelligence_custom_connector>` durch diesen Namen.
-
----
-
-## Schritt 4 — VS Code einrichten und Dateien hochladen
-
-### VS Code installieren und konfigurieren
-
-1. Laden Sie [VS Code](https://code.visualstudio.com) herunter und installieren Sie es.
-2. Öffnen Sie VS Code → klicken Sie links auf das **Erweiterungen-Symbol** (4 Quadrate).
-3. Suchen Sie nach **„Power Platform Tools"** und klicken Sie auf **„Installieren"**.
-4. Drücken Sie `Strg+Shift+P` (Windows) oder `Cmd+Shift+P` (Mac) und suchen Sie nach **„Power Platform: Anmelden"**. Folgen Sie den Anweisungen.
-
-### Dateien importieren
-
-1. Öffnen Sie in VS Code den Ordner `output/issue-1/` aus diesem Paket (**Datei → Ordner öffnen**).
-2. Drücken Sie erneut `Strg+Shift+P` → **„Power Platform: Neue Umgebung wählen"** → wählen Sie Ihre Copilot Studio-Umgebung.
-3. Drücken Sie `Strg+Shift+P` → **„Power Platform: syncPush"**.
-
-   VS Code lädt jetzt alle `.mcs.yml`-Dateien in Copilot Studio hoch. Dies dauert ca. 1–2 Minuten.
-
----
-
-## Schritt 5 — Verbindungen in Copilot Studio aktivieren
+## Schritt 3 — Neuen Agenten erstellen
 
 1. Öffnen Sie [copilotstudio.microsoft.com](https://copilotstudio.microsoft.com).
-2. Sie sehen den neuen Agenten **„Rechnungs-OCR-Automatisierung"**.
-3. Klicken Sie auf den Agenten → **„Einstellungen" → „Verbindungen"**.
-4. Aktivieren Sie folgende Verbindungen:
-   - **Office 365 Outlook** — melden Sie sich mit Ihrem M365-Konto an
-   - **Excel Online (Business)** — melden Sie sich mit Ihrem M365-Konto an
-   - **AzureDocumentIntelligence** — tragen Sie Ihren API-Schlüssel ein (aus Schritt 2)
+2. Klicken Sie auf **„+ Erstellen"** → **„Neuer Agent"**.
+3. Benennen Sie den Agenten: **`Rechnungs-OCR-Automatisierung`**
+4. Sprache: **Deutsch**
+5. Klicken Sie auf **„Erstellen"**.
 
 ---
 
-## Schritt 6 — Umgebungsvariablen setzen
+## Schritt 4 — Workflow per KI-Prompt anlegen (Weg A)
 
-Die Verbindungsdaten zur SharePoint-Datei werden als Variablen hinterlegt, damit Sie diese später einfach ändern können, ohne Dateien neu hochladen zu müssen.
+Copilot Studio hat einen eingebauten KI-Assistenten, der Topics und Aktionsknoten automatisch als bearbeitbare Elemente auf der Zeichenfläche erzeugt. Sie beschreiben, was passieren soll — die KI baut die Struktur.
 
-1. Öffnen Sie [make.powerapps.com](https://make.powerapps.com).
-2. Klicken Sie links auf **„Lösungen"** → öffnen Sie die Lösung mit dem Agenten.
-3. Klicken Sie auf **„+ Neu" → „Umgebungsvariable"** und legen Sie folgende drei Variablen an:
+### 4.1 — Haupt-Workflow-Topic per KI erstellen
 
-   | Name | Wert (Beispiel) |
-   |------|-----------------|
-   | `sharepointSiteUrl` | `https://ihrafirma.sharepoint.com/sites/Buchhaltung` |
-   | `excelFilePath` | `/Freigegebene Dokumente/Rechnungen.xlsx` |
-   | `excelTableName` | `Tabelle1` (Name aus Schritt 1 Punkt 6) |
+1. Klicken Sie im linken Menü auf **„Topics"** → **„+ Neues Topic hinzufügen"** → **„Mit Copilot erstellen"**.
+2. Geben Sie folgenden Prompt ein:
+
+```
+Erstelle ein Topic namens "RechnungsWorkflow" ohne Benutzerinteraktion.
+Der Ablauf:
+1. Empfange ein PDF-Dokument als Base64-String als Eingabe.
+2. Rufe eine Aktion "OcrSeite1" auf und übergib das PDF. Speichere die Ergebnisse Rechnungsnummer und Faelligkeitsdatum.
+3. Falls OcrSeite1 fehlschlägt, setze eine Variable "fehlerBeschreibung" mit dem Fehlertext.
+4. Rufe eine Aktion "OcrSeite2" auf und übergib das PDF. Speichere das Ergebnis als Liste "fgstnr17Werte".
+5. Falls OcrSeite2 fehlschlägt, hänge den Fehler an "fehlerBeschreibung" an und setze fgstnr17Werte auf ["__OCR_FEHLER__"].
+6. Für jeden Wert in fgstnr17Werte: Rufe "ValidiereFGSTNR17" auf. Falls ungültig, hänge den Fehlertext an "fehlerBeschreibung" an.
+7. Rufe "AppendExcelZeile" auf mit Rechnungsnummer, Faelligkeitsdatum, aktuellem fgstnr17Wert und fehlerBeschreibung.
+8. Beende den Dialog.
+```
+
+3. Klicken Sie auf **„Erstellen"** — die KI baut die Knoten automatisch auf der Zeichenfläche.
+
+### 4.2 — Validierungs-Topic per KI erstellen
+
+1. Neues Topic → **„Mit Copilot erstellen"**:
+
+```
+Erstelle ein Topic namens "ValidiereFGSTNR17" mit einer Texteingabe "rawValue".
+Prüfe den Wert auf folgende Regeln und setze bei Fehler validationPassed=false und hänge die Fehlermeldung an fehlerBeschreibung an:
+Regel 1: Länge muss genau 17 Zeichen sein. Fehlermeldung: "Länge ungültig"
+Regel 2: Nur Großbuchstaben (A-Z) und Ziffern (0-9) erlaubt. Fehlermeldung: "Ungültige Zeichen"
+Regel 3: Der Buchstabe O (Großbuchstabe) ist nicht erlaubt, nur die Ziffer 0. Fehlermeldung: "Buchstabe O gefunden"
+Alle Regeln müssen einzeln geprüft werden, auch wenn eine vorherige fehlschlägt.
+Gib validationPassed (boolean) und fehlerBeschreibung (Text) zurück.
+```
+
+> 💡 Weitere Validierungsregeln lassen sich später hier ergänzen — einfach die KI erneut mit „Füge eine Regel hinzu: ..." aufrufen.
+
+### 4.3 — Parameter nach KI-Erstellung manuell setzen
+
+Die KI erstellt die Struktur, aber **Connector-Details** müssen Sie anschließend in jedem Knoten selbst eintragen:
+
+| Knoten | Was eintragen |
+|--------|--------------|
+| OcrSeite1 / OcrSeite2 | Connector: Azure Document Intelligence → Endpunkt + Schlüssel aus Schritt 2 |
+| AppendExcelZeile | Connector: Excel Online (Business) → SharePoint-URL, Dateipfad, Tabellenname |
+| E-Mail-Trigger (Power Automate) | Posteingang-Ordner, Betreff-Filter „Rechnung" |
 
 ---
 
-## Schritt 7 — Power Automate-Flow einrichten (E-Mail-Trigger)
+## Schritt 5 — Komplexe Actions per Code-Editor einfügen (Weg B)
 
-Der Workflow in Copilot Studio verarbeitet ein einzelnes PDF/einen einzelnen Datensatz. Die äußere Schleife (für jede E-Mail, jedes PDF, jeden FGSTNR17-Wert) wird durch **Power Automate** gesteuert.
+Für Teile, die die KI unvollständig erstellt (z.B. die Validierungslogik oder die Excel-Action), können Sie das fertige YAML direkt einfügen.
+
+### So öffnen Sie den Code-Editor:
+
+1. Öffnen Sie ein Topic oder eine Action in Copilot Studio.
+2. Klicken Sie oben rechts auf die **drei Punkte `...`** → **„Code-Editor öffnen"**.
+3. Löschen Sie den vorhandenen Inhalt und fügen Sie das YAML aus der jeweiligen Datei dieses Pakets ein.
+4. Drücken Sie `Strg+S` — die Zeichenfläche aktualisiert sich automatisch.
+
+### Welche Dateien per Code-Editor einfügen:
+
+| Datei aus diesem Paket | In Copilot Studio einfügen als |
+|------------------------|-------------------------------|
+| `actions/ValidiereFGSTNR17Action.mcs.yml` | Action „ValidiereFGSTNR17" → Code-Editor |
+| `actions/OcrSeite1Action.mcs.yml` | Action „OcrSeite1" → Code-Editor |
+| `actions/OcrSeite2Action.mcs.yml` | Action „OcrSeite2" → Code-Editor |
+| `actions/AppendExcelZeileAction.mcs.yml` | Action „AppendExcelZeile" → Code-Editor |
+| `topics/RechnungsWorkflow.topic.mcs.yml` | Topic „RechnungsWorkflow" → Code-Editor |
+
+> **Hinweis:** Beim Einfügen via Code-Editor ersetzen Sie den Platzhalter `<azure_document_intelligence_custom_connector>` durch den tatsächlichen Connector-Namen (sichtbar in Copilot Studio unter Einstellungen → Verbindungen).
+
+### Platzhalter ersetzen — Übersicht:
+
+| Platzhalter in den YAML-Dateien | Ersetzen durch |
+|----------------------------------|----------------|
+| `<azure_document_intelligence_custom_connector>` | Logischer Name Ihres Azure DI Connectors |
+| `Global.sharepointSiteUrl` | URL Ihrer SharePoint-Site |
+| `Global.excelFilePath` | Pfad zur Excel-Datei (z.B. `/Freigegebene Dokumente/Rechnungen.xlsx`) |
+| `Global.excelTableName` | Tabellenname aus Schritt 1 (z.B. `Tabelle1`) |
+
+---
+
+## Schritt 6 — Verbindungen aktivieren
+
+1. Im Agenten: **Einstellungen → Verbindungen**.
+2. Aktivieren Sie:
+   - **Office 365 Outlook** — mit M365-Konto anmelden
+   - **Excel Online (Business)** — mit M365-Konto anmelden
+   - **Azure AI Document Intelligence** (custom connector) — API-Schlüssel aus Schritt 2 eintragen
+
+---
+
+## Schritt 7 — Power Automate: E-Mail-Trigger einrichten
+
+Copilot Studio verarbeitet **ein PDF / einen Datensatz** pro Aufruf. Die äußere Schleife (für jede E-Mail, jedes PDF, jeden FGSTNR17-Wert) steuert **Power Automate**. Beides geschieht im Browser.
 
 1. Öffnen Sie [make.powerautomate.com](https://make.powerautomate.com).
-2. Klicken Sie auf **„+ Erstellen" → „Automatisierter Cloud-Flow"**.
+2. **+ Erstellen → Automatisierter Cloud-Flow**.
 3. Trigger: **„Wenn eine neue E-Mail eingeht (V3)"**
    - Ordner: Posteingang
-   - Nur mit Anlagen: Ja
-   - Betreff-Filter: `Rechnung`
-4. Fügen Sie die Schleife hinzu:
-   - **„Auf alle anwenden"** → Wert: `Anlagen` (aus dem E-Mail-Trigger)
-   - Bedingung: `Name der Anlage endet mit .pdf`
-   - Innerhalb der Schleife: **„Copilot Studio-Agent ausführen"** → Wählen Sie **„Rechnungs-OCR-Automatisierung"** → übergeben Sie die PDF-Bytes als `documentBase64`
-5. Speichern und aktivieren Sie den Flow.
+   - Nur mit Anlagen: **Ja**
+   - Betreff enthält: **Rechnung**
+4. Aktion: **„Auf alle anwenden"** (Quelle: Anlagen des E-Mail-Triggers)
+   - Bedingung: Name der Anlage endet mit `.pdf`
+   - Aktion innerhalb der Schleife: **„Copilot Studio-Agent ausführen"**
+     - Agent: **Rechnungs-OCR-Automatisierung**
+     - Eingabe `documentBase64`: `Anlageninhalt` (aus dem Trigger, Base64-Format)
+5. Speichern und **Flow aktivieren**.
+
+> 💡 **Tipp:** Power Automate hat ebenfalls eine KI-Unterstützung. Sie können den Flow per Beschreibung erstellen lassen: „Erstelle einen Flow der bei eingehenden E-Mails mit Betreff Rechnung alle PDF-Anhänge an einen Copilot Studio Agenten sendet."
 
 ---
 
-## Schritt 8 — Test durchführen
+## Schritt 8 — Test
 
-1. Senden Sie sich selbst eine Test-E-Mail mit Betreff **„Rechnung"** und einem PDF-Anhang.
-2. Warten Sie ca. 1–3 Minuten.
-3. Öffnen Sie Ihre SharePoint-Excel-Datei → Sheet **„Rechnungen"**.
-4. Neue Zeilen sollten am Ende der Tabelle erscheinen.
+1. Senden Sie sich eine Test-E-Mail mit Betreff **„Rechnung"** und einem PDF-Anhang.
+2. Warten Sie 1–3 Minuten.
+3. Öffnen Sie die SharePoint-Excel-Datei → Sheet **„Rechnungen"**.
+4. Neue Zeilen erscheinen am Ende der Tabelle.
 
-**Wenn die Spalte „Fehler" befüllt ist:**  
-→ Der OCR-Dienst hat das Feld nicht gefunden. Prüfen Sie, ob die Begriffe `RECHNUNG-Nummer.:` und `Fälligkeit:` exakt so im PDF stehen.
+**Spalte „Fehler" ist befüllt?**  
+→ OCR hat die Felder nicht erkannt. Prüfen Sie, ob `RECHNUNG-Nummer.:` und `Fälligkeit:` exakt so im PDF stehen.
 
 ---
 
-## Erweiterung: Neue FGSTNR17-Validierungsregel hinzufügen
+## Validierungsregeln erweitern
 
-Die Datei `actions/ValidiereFGSTNR17Action.mcs.yml` ist modular aufgebaut. Um eine neue Regel hinzuzufügen:
+Im Topic „ValidiereFGSTNR17" können Sie jederzeit neue Regeln hinzufügen:
 
-1. Öffnen Sie die Datei in einem Texteditor.
-2. Suchen Sie den Kommentar `# ── RULE_05..N: Insert additional ConditionGroup blocks here`.
-3. Fügen Sie darunter einen neuen Block ein (Beispiel — Regel: Wert darf nicht mit „0" beginnen):
+**Per KI-Prompt** (im Topic → Copilot-Schaltfläche):
+```
+Füge eine neue Regel hinzu: Der Wert darf nicht mit der Ziffer 0 beginnen.
+Fehlermeldung: "Wert darf nicht mit 0 beginnen"
+```
+
+**Per Code-Editor** (in `ValidiereFGSTNR17Action.mcs.yml`):  
+Suchen Sie den Kommentar `# ── RULE_05..N` und fügen Sie darunter ein:
 
 ```yaml
   - kind: ConditionGroup
@@ -206,26 +230,26 @@ Die Datei `actions/ValidiereFGSTNR17Action.mcs.yml` ist modular aufgebaut. Um ei
             value: =If(Dialog.fehlerBeschreibung = "", "Wert darf nicht mit 0 beginnen", Dialog.fehlerBeschreibung & " | Wert darf nicht mit 0 beginnen")
 ```
 
-4. Laden Sie die Datei erneut via `syncPush` hoch (Schritt 4).
-
 ---
 
-## Dateien in diesem Paket
+## Dateien in diesem Paket (Referenz)
+
+Die `.mcs.yml`-Dateien dienen als fertige Vorlagen zum Einfügen per Code-Editor:
 
 ```
 output/issue-1/
-├── agent.mcs.yml                          Agent-Konfiguration
-├── settings.mcs.yml                       Sprache, Authentifizierung
+├── agent.mcs.yml                          Agent-Grundkonfiguration
+├── settings.mcs.yml                       Sprache (DE), Azure AD Auth
 ├── topics/
 │   ├── Greeting.topic.mcs.yml             Startmeldung
 │   ├── Fallback.topic.mcs.yml             Antwort bei manuellen Anfragen
-│   ├── ErrorHandler.topic.mcs.yml         Fehlerbehandlung
-│   └── RechnungsWorkflow.topic.mcs.yml    Haupt-Workflow-Logik
+│   ├── ErrorHandler.topic.mcs.yml         Systemfehler-Antwort
+│   └── RechnungsWorkflow.topic.mcs.yml    Haupt-Workflow (ein PDF pro Aufruf)
 └── actions/
     ├── HoleEmailsAction.mcs.yml           E-Mails aus Postfach abrufen
-    ├── OcrSeite1Action.mcs.yml            OCR: Rechnungsnummer + Fälligkeit
-    ├── OcrSeite2Action.mcs.yml            OCR: FGSTNR17-Tabelle (Low-Contrast)
-    ├── ValidiereFGSTNR17Action.mcs.yml    Validierung (erweiterbar)
+    ├── OcrSeite1Action.mcs.yml            OCR: Rechnungsnummer + Fälligkeit (Seite 1)
+    ├── OcrSeite2Action.mcs.yml            OCR: FGSTNR17-Tabelle, Low-Contrast (Seite 2)
+    ├── ValidiereFGSTNR17Action.mcs.yml    Validierung, modular erweiterbar
     └── AppendExcelZeileAction.mcs.yml     Zeile in SharePoint-Excel schreiben
 ```
 
@@ -235,8 +259,9 @@ output/issue-1/
 
 | Problem | Lösung |
 |---------|--------|
-| Keine Zeilen in Excel | Power Automate-Flow läuft nicht → prüfen Sie den Flow-Verlauf in make.powerautomate.com |
-| Fehler: „Verbindung nicht gefunden" | Schritt 5 — Verbindungen in Copilot Studio aktivieren |
-| Fehler: „Tabelle nicht gefunden" | Prüfen Sie `excelTableName` in den Umgebungsvariablen (Schritt 6) |
-| FGSTNR17 leer / fehlt | Scanqualität zu schlecht → OCR-Dienst hat Tabelle nicht erkannt. Testen Sie mit einem besseren Scan. |
-| Spalte „Fehler" zeigt „O gefunden" | OCR hat den Buchstaben O statt 0 erkannt — Validierung greift korrekt. Wert zur manuellen Prüfung markiert. |
+| Keine neuen Zeilen in Excel | Power Automate-Flow nicht aktiv → Flow-Verlauf unter make.powerautomate.com prüfen |
+| „Verbindung nicht gefunden" | Schritt 6 — alle drei Verbindungen aktivieren |
+| „Tabelle nicht gefunden" | Tabellenname in Schritt 1 prüfen und in Schritt 5 korrekt eintragen |
+| FGSTNR17-Werte fehlen | Scanqualität zu niedrig — mit besserem Scan testen |
+| Spalte „Fehler": „Buchstabe O gefunden" | OCR erkannte O statt 0 — Validierung greift korrekt, Wert zur manuellen Prüfung markiert |
+| Code-Editor zeigt Fehler beim Einfügen | Platzhalter `<azure_document_intelligence_custom_connector>` noch nicht ersetzt |
